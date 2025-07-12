@@ -10,7 +10,7 @@ using POE1Tools.Utilities;
 
 namespace POE1Tools.Modules
 {
-    public class ScourChanceModule
+    public class ScourChanceModule : ModuleBase
     {
         public const int COLOR_TOLERANCE = 0;
 
@@ -27,21 +27,16 @@ namespace POE1Tools.Modules
         public const float ITEM_CHECK_X = 0.33f;
         public const float ITEM_CHECK_Y = 0.68f;
 
-        public Main _main;
-        public WindowsUtil _windowsUtil;
-        public InputHook _inputHook;
-        public ColorUtil _colorUtil;
-
         private List<Point> _inventoryPoints = new List<Point>();
         private Point _craftButtonPoint;
         private Point _itemCheckPoint;
         private Color _itemSampleColor;
-        private int _itemSelecting = 0;
-        private int _tradeStep = 0;
+        private int _itemID = 0;
+        private int _step = 0;
 
 
 
-        public ScourChanceModule(Main main, WindowsUtil windowsUtil, InputHook inputHook, ColorUtil colorUtil)
+        public ScourChanceModule(Main main, WindowsUtil windowsUtil, InputHook inputHook, ColorUtil colorUtil) : base(main, windowsUtil, inputHook, colorUtil)
         {
             _main = main;
             _windowsUtil = windowsUtil;
@@ -61,76 +56,96 @@ namespace POE1Tools.Modules
             _itemCheckPoint = _colorUtil.GetPixelPosition(ITEM_CHECK_X, ITEM_CHECK_Y);
         }
 
-        public void Start()
+        public override void Start()
         {
+            base.Start();
+            
+            _itemID = 0;
+            _step = 0;
             AddDebugPoints();
-            _itemSelecting = 0;
-            _tradeStep = 0;
         }
 
-        public void Stop()
+        public override void Stop()
         {
+            base.Stop();
             RemoveDebugPoints();
         }
 
-        public void Update(float deltaTime)
+        public override void Update(float deltaTime)
         {
-            if (_tradeStep == 0)
+            base.Update(deltaTime);
+            if (_active)
             {
-                _inputHook.MoveMouse(_inventoryPoints[_itemSelecting].X, _inventoryPoints[_itemSelecting].Y);
-                _tradeStep = 1;
-            }
-            else if (_tradeStep == 1)
-            {
-                _inputHook.SendLeftClick(true);
-                _tradeStep = 2;
-            }
-            else if (_tradeStep == 2)
-            {
-                // Buffer, do nothing
-                _tradeStep = 3;
-            }
+                if (_step == 0)
+                {
+                    _inputHook.MoveMouse(_inventoryPoints[_itemID].X, _inventoryPoints[_itemID].Y);
+                    _step++;
+                }
+                else if (_step == 1)
+                {
+                    _inputHook.SendLeftClick(true);
+                    _step++;
+                }
+                else if (_step == 2)
+                {
+                    // Buffer, do nothing
+                    _step++;
+                }
 
-            else if (_tradeStep == 3)
-            {
-                _inputHook.MoveMouse(_craftButtonPoint.X, _craftButtonPoint.Y);
-                _tradeStep = 4;
-                _itemSampleColor = _colorUtil.GetColorAt(_itemCheckPoint);
-            }
-            else if (_tradeStep == 4)
-            {
-                _inputHook.SendLeftClick();
-                _tradeStep = 5;
-            }
-            else if (_tradeStep == 5)
-            {
-                Color temp = _colorUtil.GetColorAt(_itemCheckPoint);
-                if (!_colorUtil.IsColorSimilar(temp, _itemSampleColor, COLOR_TOLERANCE))
+                else if (_step == 3)
                 {
-                    _inputHook.MoveMouse(_itemCheckPoint.X, _itemCheckPoint.Y);
-                    _tradeStep = 6;
+                    _inputHook.MoveMouse(_craftButtonPoint.X, _craftButtonPoint.Y);
+                    _itemSampleColor = _colorUtil.GetColorAt(_itemCheckPoint);
+                    _step++;
                 }
-                else
+                else if (_step == 4)
                 {
-                    _tradeStep = 4;
+                    _inputHook.SendLeftClick();
+                    _step++;
                 }
-            }
-            else if (_tradeStep == 6)
-            {
-                _inputHook.SendLeftClick(true);
-                _tradeStep = 7;
-            }
-            else if (_tradeStep == 7)
-            {
-                _tradeStep = 0;
-                _itemSelecting ++;
-                if (_itemSelecting >= INVENTORY_W * INVENTORY_H / 2)
+                else if (_step == 5)
                 {
-                    _main.Stop();
+                    Color temp = _colorUtil.GetColorAt(_itemCheckPoint);
+                    if (!_colorUtil.IsColorSimilar(temp, _itemSampleColor, COLOR_TOLERANCE))
+                    {
+                        _inputHook.MoveMouse(_itemCheckPoint.X, _itemCheckPoint.Y);
+                        _step++;
+                    }
+                    else
+                    {
+                        _step--;
+                    }
+                }
+                else if (_step == 6)
+                {
+                    _inputHook.SendLeftClick(true);
+                    _step++;
+                }
+                else if (_step == 7)
+                {
+                    _itemID++;
+                    if (_itemID >= INVENTORY_W * INVENTORY_H / 2)
+                    {
+                        Stop();
+                    }
+                    _step = 0;
                 }
             }
         }
+        public override void OnKeyEvent(Keys key, bool isDown, bool isControlDown)
+        {
+            base.OnKeyEvent(key, isDown, isControlDown);
+        }
+        public override void OnMouseKeyEvent(MouseButtons key, bool isDown)
+        {
+            base.OnMouseKeyEvent(key, isDown);
+        }
 
+
+
+
+
+        // ============================ DEBUG ================================
         private void AddDebugPoints()
         {
             for (int i = 0; i < _inventoryPoints.Count; i++)
@@ -150,6 +165,6 @@ namespace POE1Tools.Modules
             _windowsUtil.RemoveDebugDrawPoint(_craftButtonPoint);
             _windowsUtil.RemoveDebugDrawPoint(_itemCheckPoint);
         }
-
+        // ===================================================================
     }
 }

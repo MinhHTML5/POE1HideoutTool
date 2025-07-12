@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using POE1Tools.Utilities;
 using System.Diagnostics;
 using POE1Tools.Modules;
+using System.Collections.Generic;
 
 namespace POE1Tools
 {
@@ -18,10 +19,8 @@ namespace POE1Tools
         private InputHook _inputHook;
         private ColorUtil _colorUtil;
 
-        private DivCardModule _divCardModule;
-        private ScourChanceModule _scouChanceModule;
-
-        public bool active = false;
+        private List<ModuleBase> _modules = new List<ModuleBase>();
+        private int _moduleSelecting = 0;
 
         private Timer _timer = new Timer();
         private Stopwatch _stopwatch = new Stopwatch();
@@ -35,10 +34,73 @@ namespace POE1Tools
             _inputHook = inputHook;
             _colorUtil = colorUtil;
 
-
             InitializeComponent();
         }
+        private void Main_Load(object sender, EventArgs e)
+        {
+            _inputHook.RegisterRawInputDevices(this.Handle, OnMouseKeyEvent, OnKeyEvent);
 
+            _timer.Interval = UPDATE_INTERVAL;
+            _timer.Tick += (s, e) => MainLoop();
+            _timer.Start();
+            _stopwatch.Start();
+
+            InitModules();
+        }
+        private void InitModules()
+        {
+            _modules.Add(new DivCardModule(this, _windowsUtil, _inputHook, _colorUtil));
+            _modules.Add(new ScourChanceModule(this, _windowsUtil, _inputHook, _colorUtil));
+        }
+        private void MainLoop()
+        {
+            int deltaTime = (int)(_stopwatch.Elapsed.TotalMilliseconds);
+            _stopwatch.Restart();
+
+            _modules[_moduleSelecting].Update(deltaTime);
+        }
+        private void OnKeyEvent(Keys key, bool isDown, bool isControlDown)
+        {
+            _modules[_moduleSelecting].OnKeyEvent(key, isDown, isControlDown);
+        }
+        private void OnMouseKeyEvent(MouseButtons key, bool isDown)
+        {
+            _modules[_moduleSelecting].OnMouseKeyEvent(key, isDown);
+        }
+
+
+
+
+        // ======================= UI =========================
+        private void HideAllGroupBox()
+        {
+            grpDivCard.Visible = false;
+            grpScourChance.Visible = false;
+        }
+        private void optDivCard_CheckedChanged(object sender, EventArgs e)
+        {
+            HideAllGroupBox();
+            grpDivCard.Visible = true;
+            _moduleSelecting = 0;
+        }
+        private void optScourChance_CheckedChanged(object sender, EventArgs e)
+        {
+            HideAllGroupBox();
+            grpScourChance.Visible = true;
+            _moduleSelecting = 1;
+        }
+        private void trkRate_Scroll(object sender, EventArgs e)
+        {
+            _timer.Interval = trkRate.Value * 25;
+            lblUpdateRate.Text = "Command rate: " + _timer.Interval + "ms";
+        }
+        // ======================= UI =========================
+
+
+
+
+
+        // ================== DON'T TOUCH =====================
         private const int WM_INPUT = 0x00FF;
         protected override void WndProc(ref Message m)
         {
@@ -49,94 +111,6 @@ namespace POE1Tools
 
             base.WndProc(ref m);
         }
-
-        private void Main_Load(object sender, EventArgs e)
-        {
-            _divCardModule = new DivCardModule(this, _windowsUtil, _inputHook, _colorUtil);
-            _scouChanceModule = new ScourChanceModule(this, _windowsUtil, _inputHook, _colorUtil);
-
-            _inputHook.RegisterRawInputDevices(this.Handle, OnMouseKeyEvent, OnKeyEvent);
-
-            _timer.Interval = UPDATE_INTERVAL;
-            _timer.Tick += (s, e) => MainLoop();
-            _timer.Start();
-            _stopwatch.Start();
-        }
-
-        private void MainLoop()
-        {
-            // This variable turn off all submodule from doing logic, but still let them to count cooldown
-            bool shouldDoLogic = true;
-            int deltaTime = (int)(_stopwatch.Elapsed.TotalMilliseconds);
-            _stopwatch.Restart();
-
-            if (active == true)
-            {
-                if (optDivCard.Checked == true)
-                {
-                    _divCardModule.Update(deltaTime);
-                }
-                else if (optScourChance.Checked == true)
-                {
-                    _scouChanceModule.Update(deltaTime);
-                }
-            }
-        }
-
-        public void Start()
-        {
-            active = true;
-            _divCardModule.Start();
-            _scouChanceModule.Start();
-        }
-
-        public void Stop()
-        {
-            active = false;
-            _divCardModule.Stop();
-            _scouChanceModule.Stop();
-        }
-
-
-
-        private void OnKeyEvent(Keys key, bool isDown, bool isControlDown)
-        {
-            if (key == Keys.Up && isControlDown == true)
-            {
-                Start();
-            }
-            else if (key == Keys.Down && isControlDown == true)
-            {
-                Stop();
-            }
-        }
-
-        private void OnMouseKeyEvent(MouseButtons key, bool isDown)
-        {
-
-        }
-
-        private void trkRate_Scroll(object sender, EventArgs e)
-        {
-            _timer.Interval = trkRate.Value * 25;
-            lblUpdateRate.Text = "Command rate: " + _timer.Interval + "ms";
-        }
-
-        private void HideAllGroupBox()
-        {
-            grpDivCard.Visible = false;
-            grpScourChance.Visible = false;
-        }
-
-        private void optDivCard_CheckedChanged(object sender, EventArgs e)
-        {
-            HideAllGroupBox();
-            grpDivCard.Visible = true;
-        }
-        private void optScourChance_CheckedChanged(object sender, EventArgs e)
-        {
-            HideAllGroupBox();
-            grpScourChance.Visible = true;
-        }
+        // ======================= UI =========================
     }
 }
